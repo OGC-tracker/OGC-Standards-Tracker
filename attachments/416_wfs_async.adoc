@@ -1,0 +1,868 @@
+﻿
+== Asynchronous request processing
+
+=== Introduction
+
+This clause describes a light-weight protocol for processing long-running 
+operations asynchronously. Rather than the standard request-response
+invocation pattern – where a client submits a request and then waits to get
+the response from the server – an asynchronous request is executed in the
+background by the server and either a notification message is sent when
+operation processing has completed or (depending on the conformance classes
+implemented) the server may be polled periodically to determine the execution
+status of the request.
+
+The target service implementation for this capability for Testbed 12 is the
+WFS. However, it is envisioned that the approach described here could apply
+to a number of OGC services (WCS, CSW, etc.).
+
+For the WFS standard, the following operations may be invoked asynchronously:
+
+   . GetPropertyValue
+   . GetFeature
+   . GetFeatureWithLock
+   . LockFeature
+   . Transaction
+
+=== Conformance classes
+
+Two conformance classes are defined for asynchronous request processing:
+
+   . Asynchronous Processing
+   . Asynchronous Polling
+
+For the Asynchronous Processing conformance class, a server implements the
+ability to accept an asynchronous request, acknowledge that the request was
+successfully accepted, process the request in the background and finally
+send a notification -- using the specified response handler -- when the
+request's processing has been completed. Servers that implement this class
+may optionally provide a hypermedia control that may be used to cancel the
+asynchronous request after it has been invoked.
+
+For the Asynchronous Polling conformance class, a server implements the
+ability to accept an asynchronous request, acknowledge that the request was
+successfully accepted, process the request in the background and allow
+the server to be polled periodically to obtain the execution status and
+progress of the request's execution. Once request processing has been
+completed a hypermedia control, provided by the server, will allow the
+request's response to be retrieved.
+
+=== Request semantics
+
+Asynchronous request processing shall be triggered by the presence of the
+ResponseHandler parameter.
+
+When an operation is invoked asynchronously, the server shall immediately
+respond with an acknowledgement message (see <<AcknowlegementEncoding>>)
+that indicates that the request has been successfully accepted or an
+exception messages if there was a problem. At this point communication
+with the server shall terminate.
+
+The server shall then proceed to process the request in the background,
+taking as much time as necessary to completed its processing.
+
+For servers that implement the Asynchronous Processing class, when request 
+processing has completed a notification message shall be sent using the
+scheme(s) specified as the value of the ResponseHandler parameter. The 
+content of the notification message is discussed in clause
+<<NotificationMessage>>.
+
+For servers that implement the Asynchronous Polling class, the acknowledgement
+message shall contain a means by which the server may be polled to determine
+the execution status of the request (see <<AcknowledgementEncoding>>).  When
+request processing has been completed, the acknowledgement message shall
+contain a means by which the request's response may be retrieved.
+
+==== Parameter discussion
+
+The value of the ResponseHandler parameter shall be a list of one or more
+values. The value of each element of the list shall either be a URI or the
+token "poll".
+
+If a list element value of the ResponseHandler parameter is a URI, then its
+form shall be  a valid expression of the one the notification schemes that
+the server claims to support in its capabilities document (see
+<<CapabilitiesResponse>>). 
+
+This standard does not define a normative set of notification schemes but 
+possible schemes include:
+
+   * Email scheme as per RFC 2368
+   ** Example -- mailto:tb12@pvretano.com
+
+   * Sms scheme as per Apple Inc. (or perhaps RFC 5724)
+   ** Example – sms:1-555-555-5555
+
+   * Webhook as per http://www.webhooks.org
+   ** Example --  http://www.myserver.com/posthandler
+
+The specific set of schemes supported for each operation shall be advertised 
+in the server's capabilities document (see <<CapabilitiesResponse>>).
+
+If a list element value of the ResponseHandler parameter is the token "poll",
+the server shall, in its acknowledgement message (see
+<<AcknowledgementEncoding>>), provide a hypermedia control (see
+<<AsyncPollingSemantics>>) that may be used to poll the server periodically
+to determine the execution status of the request.
+
+If more than one instance of the "poll" token appears as a list element value
+of the ResponseHandler parameter, the extraneous instances of the token shall
+be ignored.  The "poll" token need only appear once to trigger the inclusion 
+of the status, progress and control elements within the acknowledgement 
+messages (see <<AsyncPollingSemantics>>).
+
+==== [[ResponseHandler]]XML encoding
+
+The following XML-Schema fragment defines the XML-encoding for this parameter:
+
+----
+   <xsd:element name="ResponseHandler" type="xsd:anyUri"/>
+----
+
+==== KVP encoding
+
+Table 1 defines the KVP-encoding for the ResponseHandler parameter.
+
+.KVP-encoding for the ResponseHandler parameter
+[width="80%",cols="3,^2,10",options="header"]
+|=========================================================
+|URL Component |O/M |Description
+|RESPONSEHANDLER | O | An URI indicating the notification method
+|=========================================================
+NOTE: O = Optional, M = Mandatory
+
+==== Examples
+
+The following example fetches NHD flowlines from the TB12 A007 WFS using an
+asynchronous XML-encoded GetFeature request:
+
+----
+<?xml version="1.0" ?>
+<GetFeature
+   version="2.5.0"
+   service="WFS"
+   xmlns="http://www.opengis.net/wfs/2.5"
+   xmlns:fes="http://www.opengis.net/fes/2.5"
+   xmlns:gml="http://www.opengis.net/gml/3.2"
+   xmlns:cw="http://schemas.cubewerx.com/namespaces/null"
+   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+   xsi:schemaLocation="http://www.opengis.net/wfs/2.5
+                       http://schemas.cubewerx.com/schemas/wfs/2.5/wfs.xsd
+                       http://www.opengis.net/gml/3.2
+                       http://schemas.opengis.net/gml/3.2.1/gml.xsd
+                       http://schemas.cubewerx.com/namespaces/null
+                       http://tb12.cubewerx.com/a007/cubeserv?datastore=USGS&amp;service=WFS&amp;version=2.5&amp;request=DescribeFeatureType&amp;typeNames=NHDFlowline">
+   <Query typeNames="cw:NHDFlowline">
+      <fes:Filter>
+         <fes:BBOX>
+            <fes:ValueReference>GEOMETRY</fes:ValueReference>
+            <gml:Envelope srsName="http://www.opengis.net/def/crs/epsg/0/4326">
+               <gml:lowerCorner>37.709077 -122.513476</gml:lowerCorner>
+               <gml:upperCorner>37.839064 -122.351771</gml:upperCorner>
+            </gml:Envelope>
+         </fes:BBOX>
+      </fes:Filter>
+   </Query>
+   <ResponseHandler>mailto:tb12@pvretano.com</ResponseHandler>
+</GetFeature>
+----
+
+The following example fetches NHD flowlines from the TB12 A007 WFS using an
+asynchronous KVP-encoded GetFeature request:
+
+----
+http://tb12.cubewerx.com/a007/cubeserv?datastore=USGS&
+   service=WFS&
+   version=2.0.2&
+   request=GetFeature&
+   typeNames=NHDFlowline&
+   count=100&
+   outputFormat=application%2Fgml%2Bxml&
+   responseHandler=mailto:tb12@pvretano.com&
+   bbox=37.709077,-122.513476,37.839064,-122.351771,urn:ogc:def:crs:EPSG::4326
+----
+
+NOTE: Examples in this clause may be formatted to facilitate readability as
+      is the case in this example which has been wrapped to highlight the
+      request parameters.
+
+=== Response
+
+==== Introduction
+
+This clause defines the XML-Schema of the acknowledgement message that is 
+used to signal that an asynchronous request has been successfully accepted.
+The same message schema is also used in response to a polling request to
+indicate the execution status of an asynchronous request.
+
+==== [[AcknowledgementEncoding]] XML encoding 
+
+The following XML-Schema fragment defines the ows:Acknowledgment element:
+
+----
+   <xsd:element name="Acknowledgment"
+                type="ows:Acknowledgement" id="Acknowledgement"/>
+   <xsd:complexType name="Acknowledgement" id="AcknowledgementType">
+      <xsd:sequence>
+         <xsd:element ref="atom:link" minOccurs="0" maxOccurs="unbounded"/>
+         <xsd:element name="Status"
+                      type="wfs:ExecutionStatusType" minOccurs="0"/>
+         <xsd:element name="PercentCompleted"
+                      type="xsd:nonNegativeInteger" minOccurs="0"/>
+      </xsd:sequence>
+   </xsd:complexType>
+
+   <xsd:simpleType name="ExecutionStatusType">
+      <xsd:union>
+         <xsd:simpleType>
+            <xsd:restriction base="xsd:string">
+               <xsd:enumeration value="cancelled"/>
+               <xsd:enumeration value="completed"/>
+               <xsd:enumeration value="executing"/>
+               <xsd:enumeration value="pending"/>
+            </xsd:restriction>
+         </xsd:simpleType>
+         <xsd:simpleType>
+            <xsd:restriction base="xsd:string">
+               <xsd:pattern value="other:\w{2,}"/>
+            </xsd:restriction>
+         </xsd:simpleType>
+      </xsd:union>
+   </xsd:simpleType>
+----
+
+When an operation is invoked asynchronously, the server shall respond
+immediately with an ows:Acknowledgment message indicating that the server
+has successfully accepted the request or an OGC exception message indicating
+an error. If successfully accepted, the HTTP status code shall be set to
+"202 Accepted".
+
+==== [[AsynchronousProcessing]]Asynchronous Processing class
+
+===== Response semantics
+
+For servers that implement the Asynchronous Processing conformance class, the
+ows:Acknowledgment message may contain an atom:link element, with rel="cancel",
+that may be used to cancel the asynchronously invoked operation.
+
+The response to resolving the rel="cancel" link shall be an ows:Acknowledgment
+message that shall contains the wfs:Status element with its value set to
+"cancelled". The HTTP status code in this case shall be set to "200 OK".
+
+NOTE: The "cancel" link may also be included in the response's HTTP header
+using the Link field (see RFC 5988).
+
+NOTE: This document does not define a specific template, form or encoding of
+any link that appears in an acknowledgement message. Server implementations
+are free to encode the URI value of the href attribute of an atom:link element
+in whatever way they deem suitable.
+
+NOTE: When resolving links, this should be done with the same credentials
+as the original asynchronous request.
+
+[[AsyncProcessingClassSeq]]
+.Sequence diagram for the Asynchronous Process Class
+image::includes/images/AsynchronousProcessingClass_SequenceDiagram_800x475.png["Sequence diagram for the Asynchronous Processing Class",scaledwidth=85%,align="center"]
+
+===== Examples
+
+Example 1: Simple acknowledgement.
+----
+   <ows:Acknowledgement/>
+----
+
+Example 2: Simple acknowledgement with a hypermedia control to cancel the
+request.
+----
+   <ows:Acknowledgement>
+      <atom:link rel="cancel" href="http://www.someserver.com/jobs/cancel/1013"/>
+   </ows:Acknowledgement>
+----
+
+==== Asynchronous Polling class
+
+===== [[AsyncPollingSemantics]]Response semantics
+
+For servers that implement the Asynchronous Polling conformance class, the
+ows:Acknowledgment message shall include an atom:link element, with
+rel="monitor", that may be periodically resolved to determine the execution
+status of an asynchronous request.
+
+The response to resolving the rel="monitor" link shall be a ows:Acknowledgment
+message that shall contain the wfs:Status element indicating the execution
+status of the asynchronous request and may include a wfs:PercentCompleted
+element with a percentage value indicating how much of the request has been
+completed. The HTTP status code in this case shall be set to "200 OK".
+
+Requesting the execution status of an asynchronous request after its processing
+has been completed -- and the operation's response is still available -- shall
+result in an ows:Acknowledgement message that shall contain a wfs:Status element
+with its value set to "completed" and shall also include an atom:link element,
+with  rel="http://www.opengis.net/def/rel/ogc/1.0/operationResponse", that
+provides a URI that may be used to retrieve the response.
+
+Requesting the execution status of an asynchronous request after its processing
+has been completed -- and the operation's response is no longer available (e.g.
+is has expired) -- shall result in an OGC exception message and the HTTP status
+code shall be set to "404 Not Found".
+
+NOTE: The rel "http://www.opengis.net/def/rel/ogc/1.0/operationResponse" is 
+an extension relation type (see RFC 5988, Section 4.2) and shall, in due course,
+be defined with OGC Naming Authority.
+
+NOTE: The "http://www.opengis.net/def/rel/ogc/1.0/operationResponse", "monitor"
+and  "cancel" links may also be included in the response's HTTP header using the
+Link field (see RFC 5988).
+
+[[AsyncPollingClassSeq]]
+.Sequence diagram for the Asynchronous Polling Class
+image::includes/images/AsynchronousPollingClass_SequenceDiagram800x800.png["Sequence diagram for the Asynchronous Processing Class",scaledwidth=85%,align="center"]
+
+==== Examples
+
+Example 1: The following example shows the response that a server that
+implements the Asynchronous Polling conformance class might initially
+generate in response to an asynchronously invoked operation.  The
+acknowledgement message contains hypermedia controls to monitor the
+execution status of the request and to cancel the request.  The execution
+status at this time is _pending_ indicating that the request has been
+queued for execution.
+----
+<ows:Acknowledgement>
+   <atom:link rel="monitor" href="http://www.someserver.com/jobs/1013"/>
+   <atom:link rel="cancel" href="http://www.someserver.com/jobs/cancel/1013"/>
+   <ows:Status>pending</ows:Status>
+</ows:Acknowledgement>
+----
+
+Example 2: The following example shows a polling response some time after an
+operation was invoked asynchronously. The acknowledgement message contains
+hypermedia controls to monitor the execution status of the request and to
+cancel the request.
+----
+<ows:Acknowledgement>
+   <atom:link rel="monitor" href="http://www.someserver.com/jobs/1013"/>
+   <atom:link rel="cancel" href="http://www.someserver.com/jobs/cancel/1013"/>
+   <ows:Status>executing</ows:Status>
+   <ows:PercentCompleted>47</ows:PercentCompleted>
+</ows:Acknowledgement>
+----
+
+Example 3: This following examples shows the polling response after request
+processing has been completed.  Resolving the hypermedia control with
+rel="http://www.opengis.net/def/rel/ogc/1.0/operationResponse" will retrieve
+the request's response if it is still available; if the response is not
+available (e.g. it has expired from the cache) resolving the control would 
+result in an OGC exception message and a "404 Not Found".
+----
+<ows:Acknowledgement>
+   <atom:link rel="http://www.opengis.net/def/rel/ogc/1.0/operationResponse"
+              href="http://www.someserver.com/jobs/results/1013"/>
+   <ows:Status>Completed</ows:Status>
+</ows:Acknowledgement>
+----
+
+=== [[NotificationMessage]]Notification message content
+
+For servers that implement the Asynchronous Processing conformance class, an
+operation's response shall be accessible via the notification message sent by
+the server using the specified response handler(s) (see <<ResponseHandler>>) to
+signal that request processing has been completed.
+
+In general the content of a notification message shall either be the operation's
+complete response, or a reference to it, or an exception message.
+
+The specific content of a notification message is not defined in this
+document because it is dependent on the scheme(s) specified
+as the value of the ResponseHandler parameter (see <<ResponseHandler>>).
+For size-limited schemes, such as sms, a URL reference to the response would
+seem to be most appropriate since the entire response content is unlikely to
+fit into the message space. For other schemes, such as webhooks, the content
+of the notification message can be the complete response of the operation
+(e.g. the response to a GetFeature request). The following table contains
+informative recommendations for the content of notification messages based
+on the scheme being used:
+
+.Recommended content for the notification message based on scheme
+[width="90%",cols="20%,40%,40%", options="header"]
+|=========================================================
+| Notification scheme
+| Recommended content (good response)
+| Recommended content (exception)
+| mailto:
+| An email message containing a URL for retrieving the operation's response.
+| An email message containing a narrative that describes the exception; an optional attachment with the server's actual OGC exception message may also be included
+| sms:
+| A URL for retrieving the operation's response; tiny URLs may be used if the retrieval URL is particularly long
+| A URL for retrieving the server's OGC exception message; tiny URLs may be used if the retrieval URL is particularly long
+|http: (webhook)
+| The operation's complete response
+| The complete OGC exception message
+|=========================================================
+
+=== [[CapabilitiesResponse]]Capabilities document
+
+==== Introduction
+
+A server that implements the Asynchronous Processing conformance class shall
+advertise this fact in its capabilities document using the
+ImplementsAsyncProcessing service constraint.
+
+A server that implements the Asynchronous Polling conformance class shall
+advertise this fact in its capabilities document using the
+ImplementsAsyncPolling service constraint.
+
+A server that support asynchronous request processing shall, in its
+capabilities document, use the ResponseHandlerSchemes operation constraint to
+indicate which notification schemes it supports (e.g. mailto for email, http
+for webhooks, etc.) for each operation that may be executed asynchronously.
+The "poll" token shall be included in the list of response handler schemes if
+the service implements the Asynchronous Polling conformance class.
+
+==== Examples
+
+The following example shows the capabilities document for a server that
+implements the Asynchronous Processing conformance class.
+----
+   <?xml version="1.0" encoding="UTF-8"?>
+   <WFS_Capabilities
+      version="2.0.0"
+      xmlns="http://www.opengis.net/wfs/2.0"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:ows="http://www.opengis.net/ows/1.1"
+      xmlns:cw="http://schemas.cubewerx.com/namespaces/null"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.opengis.net/wfs/2.0 http://schemas.cubewerx.com/schemas/wfs/2.0/wfs.xsd http://www.opengis.net/ows/1.1 http://schemas.cubewerx.com/schemas/ows/1.1.0/owsAll.xsd">
+      <ows:ServiceIdentification xmlns:ows="http://www.opengis.net/ows/1.1">
+         <ows:Title>CubeSERV WFS - New CubeSTOR (mysql)</ows:Title>
+         <ows:Abstract xml:lang="en">WFS-compliant web feature server by CubeWerx Inc.</ows:Abstract>
+         <ows:ServiceType>WFS</ows:ServiceType>
+         <ows:ServiceTypeVersion>2.5.0</ows:ServiceTypeVersion>
+         <ows:ServiceTypeVersion>2.0.2</ows:ServiceTypeVersion>
+         <ows:ServiceTypeVersion>2.0.0</ows:ServiceTypeVersion>
+         <ows:ServiceTypeVersion>1.1.1</ows:ServiceTypeVersion>
+         <ows:ServiceTypeVersion>1.1.0</ows:ServiceTypeVersion>
+         <ows:ServiceTypeVersion>1.0.0</ows:ServiceTypeVersion>
+      </ows:ServiceIdentification>
+      <ows:ServiceProvider xmlns:ows="http://www.opengis.net/ows/1.1"
+         xmlns:xlink="http://www.w3.org/1999/xlink">
+         <ows:ProviderName>CubeWerx Inc.</ows:ProviderName>
+         <ows:ProviderSite xlink:href="http://www.cubewerx.com/"/>
+         <ows:ServiceContact>
+            <ows:IndividualName>Mike Galluchon</ows:IndividualName>
+            <ows:PositionName>Technical Support</ows:PositionName>
+            <ows:ContactInfo>
+               <ows:Phone>
+                  <ows:Voice>(819) 771-8303</ows:Voice>
+                  <ows:Facsimile>(819) 771-8388</ows:Facsimile>
+               </ows:Phone>
+               <ows:Address>
+                  <ows:DeliveryPoint>815 boulevard de la Carrière, bureau 202</ows:DeliveryPoint>
+                  <ows:City>Gatineau</ows:City>
+                  <ows:AdministrativeArea>Québec</ows:AdministrativeArea>
+                  <ows:PostalCode>J8Y 6T4</ows:PostalCode>
+                  <ows:Country>Canada</ows:Country>
+                  <ows:ElectronicMailAddress>support@cubewerx.com</ows:ElectronicMailAddress>
+               </ows:Address>
+            </ows:ContactInfo>
+         </ows:ServiceContact>
+      </ows:ServiceProvider>
+      <ows:OperationsMetadata>
+         <ows:Operation name="GetCapabilities">
+            <ows:DCP>
+               <ows:HTTP>
+                  <ows:Get
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql&amp;"/>
+                  <ows:Post
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql"/>
+               </ows:HTTP>
+            </ows:DCP>
+            <ows:Parameter name="AcceptVersions">
+               <ows:AllowedValues>
+                  <ows:Value>2.5.0</ows:Value>
+                  <ows:Value>2.0.2</ows:Value>
+                  <ows:Value>2.0.0</ows:Value>
+                  <ows:Value>1.1.1</ows:Value>
+                  <ows:Value>1.1.0</ows:Value>
+                  <ows:Value>1.0.0</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+            <ows:Parameter name="AcceptFormats">
+               <ows:AllowedValues>
+                  <ows:Value>text/xml</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+            <ows:Parameter name="Sections">
+               <ows:AllowedValues>
+                  <ows:Value>ServiceIdentification</ows:Value>
+                  <ows:Value>ServiceProvider</ows:Value>
+                  <ows:Value>OperationsMetadata</ows:Value>
+                  <ows:Value>FeatureTypeList</ows:Value>
+                  <ows:Value>SupportsGMLObjectTypeList</ows:Value>
+                  <ows:Value>Filter_Capabilities</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+         </ows:Operation>
+         <ows:Operation name="GetDescription">
+            <ows:DCP>
+               <ows:HTTP>
+                  <ows:Get
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql&amp;"/>
+                  <ows:Post
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql"/>
+               </ows:HTTP>
+            </ows:DCP>
+            <ows:Parameter name="outputFormat">
+               <ows:AllowedValues>
+                  <ows:Value>text/html</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+         </ows:Operation>
+         <ows:Operation name="DescribeFeatureType">
+            <ows:DCP>
+               <ows:HTTP>
+                  <ows:Get
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql&amp;"/>
+                  <ows:Post
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql"/>
+               </ows:HTTP>
+            </ows:DCP>
+            <ows:Parameter name="version">
+               <ows:AllowedValues>
+                  <ows:Value>2.5.0</ows:Value>
+                  <ows:Value>2.0.2</ows:Value>
+                  <ows:Value>2.0.0</ows:Value>
+                  <ows:Value>1.1.1</ows:Value>
+                  <ows:Value>1.1.0</ows:Value>
+                  <ows:Value>1.0.0</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+            <ows:Parameter name="TypeName">
+               <ows:AllowedValues>
+                  <ows:Value>cw:builtupa_1m</ows:Value>
+                  <ows:Value>cw:coastl_1m</ows:Value>
+                  <ows:Value>cw:depthl_1m</ows:Value>
+                  <ows:Value>cw:polbndl_1m</ows:Value>
+                  <ows:Value>cw:soundings</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+            <ows:Parameter name="outputFormat">
+               <ows:AllowedValues>
+                  <ows:Value>text/xml; subtype="bxfs/0.0.3"</ows:Value>
+                  <!-- ... -->
+                  <ows:Value>XMLSCHEMA</ows:Value>
+                  <!-- ... -->
+                  <ows:Value>application/gml+xml; version=3.2</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+         </ows:Operation>
+         <ows:Operation name="ListStoredQueries">
+            <ows:DCP>
+               <ows:HTTP>
+                  <ows:Get
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql&amp;"/>
+                  <ows:Post
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql"/>
+               </ows:HTTP>
+            </ows:DCP>
+            <ows:Parameter name="version">
+               <ows:AllowedValues>
+                  <ows:Value>2.5.0</ows:Value>
+                  <ows:Value>2.0.2</ows:Value>
+                  <ows:Value>2.0.0</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+         </ows:Operation>
+         <ows:Operation name="DescribeStoredQueries">
+            <ows:DCP>
+               <ows:HTTP>
+                  <ows:Get
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql&amp;"/>
+                  <ows:Post
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql"/>
+               </ows:HTTP>
+            </ows:DCP>
+            <ows:Parameter name="version">
+               <ows:AllowedValues>
+                  <ows:Value>2.5.0</ows:Value>
+                  <ows:Value>2.0.2</ows:Value>
+                  <ows:Value>2.0.0</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+         </ows:Operation>
+         <ows:Operation name="GetPropertyValue">
+            <ows:DCP>
+               <ows:HTTP>
+                  <ows:Get
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql&amp;"/>
+                  <ows:Post
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql"/>
+               </ows:HTTP>
+            </ows:DCP>
+            <ows:Parameter name="version">
+               <ows:AllowedValues>
+                  <ows:Value>2.5.0</ows:Value>
+                  <ows:Value>2.0.2</ows:Value>
+                  <ows:Value>2.0.0</ows:Value>
+                  <ows:Value>1.1.1</ows:Value>
+                  <ows:Value>1.1.0</ows:Value>
+                  <ows:Value>1.0.0</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+            <ows:Parameter name="outputFormat">
+               <ows:AllowedValues>
+                  <ows:Value>text/xml; subtype="bxfs/0.0.3"</ows:Value>
+                  <!-- ... -->
+                  <ows:Value>application/gml+xml; version=3.2</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+            <ows:Parameter name="resolve">
+               <ows:AllowedValues>
+                  <ows:Value>none</ows:Value>
+                  <ows:Value>local</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+            <ows:Parameter name="srsName">
+               <ows:AllowedValues>
+                  <ows:Value>urn:ogc:def:crs:EPSG::42110</ows:Value>
+                  <!-- ... -->
+                  <ows:Value>urn:ogc:def:crs:EPSG::102002</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+         </ows:Operation>
+         <ows:Operation name="GetFeature">
+            <ows:DCP>
+               <ows:HTTP>
+                  <ows:Get
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql&amp;"/>
+                  <ows:Post
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql"/>
+               </ows:HTTP>
+            </ows:DCP>
+            <ows:Parameter name="version">
+               <ows:AllowedValues>
+                  <ows:Value>2.5.0</ows:Value>
+                  <ows:Value>2.0.2</ows:Value>
+                  <ows:Value>2.0.0</ows:Value>
+                  <ows:Value>1.1.1</ows:Value>
+                  <ows:Value>1.1.0</ows:Value>
+                  <ows:Value>1.0.0</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+            <ows:Parameter name="outputFormat">
+               <ows:AllowedValues>
+                  <ows:Value>text/xml; subtype="bxfs/0.0.3"</ows:Value>
+                  <!-- ... -->
+                  <ows:Value>application/gml+xml; version=3.2</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+            <ows:Parameter name="resolve">
+               <ows:AllowedValues>
+                  <ows:Value>none</ows:Value>
+                  <ows:Value>local</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+            <ows:Parameter name="srsName">
+               <ows:AllowedValues>
+                  <ows:Value>urn:ogc:def:crs:EPSG::42110</ows:Value>
+                  <!-- ... -->
+                  <ows:Value>urn:ogc:def:crs:EPSG::102002</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+            <ows:Constraint name="ResponseHandlerSchemes">
+               <ows:AllowedValues>
+                  <ows:Value>mailto:</ows:Value>
+               </ows:AllowedValues>
+            </ows:Constraint>
+         </ows:Operation>
+         <ows:Operation name="GetAccessibility">
+            <ows:DCP>
+               <ows:HTTP>
+                  <ows:Get
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql&amp;"/>
+                  <ows:Post
+                     xlink:href="http://tb12.cubewerx.com/cubewerx/cubeserv?datastore=foundation_mysql"/>
+               </ows:HTTP>
+            </ows:DCP>
+            <ows:Parameter name="version">
+               <ows:AllowedValues>
+                  <ows:Value>2.5.0</ows:Value>
+                  <ows:Value>2.0.2</ows:Value>
+                  <ows:Value>2.0.0</ows:Value>
+                  <ows:Value>1.1.1</ows:Value>
+                  <ows:Value>1.1.0</ows:Value>
+                  <ows:Value>1.0.0</ows:Value>
+               </ows:AllowedValues>
+            </ows:Parameter>
+         </ows:Operation>
+         <!-- ============================================================= -->
+         <!--                     CONFORMANCE SECTION                       -->
+         <!-- ============================================================= -->
+         <ows:Constraint name="ImplementsBasicWFS">
+            <ows:NoValues/>
+            <ows:DefaultValue>TRUE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="ImplementsTransactionalWFS">
+            <ows:NoValues/>
+            <ows:DefaultValue>FALSE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="ImplementsLockingWFS">
+            <ows:NoValues/>
+            <ows:DefaultValue>FALSE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="KVPEncoding">
+            <ows:NoValues/>
+            <ows:DefaultValue>TRUE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="XMLEncoding">
+            <ows:NoValues/>
+            <ows:DefaultValue>TRUE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="SOAPEncoding">
+            <ows:NoValues/>
+            <ows:DefaultValue>FALSE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="ImplementsInheritance">
+            <ows:NoValues/>
+            <ows:DefaultValue>FALSE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="ImplementsRemoteResolve">
+            <ows:NoValues/>
+            <ows:DefaultValue>FALSE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="ImplementsResultPaging">
+            <ows:NoValues/>
+            <ows:DefaultValue>FALSE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="ImplementsStandardJoins">
+            <ows:NoValues/>
+            <ows:DefaultValue>FALSE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="ImplementsSpatialJoins">
+            <ows:NoValues/>
+            <ows:DefaultValue>FALSE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="ImplementsTemporalJoins">
+            <ows:NoValues/>
+            <ows:DefaultValue>FALSE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="ImplementsFeatureVersioning">
+            <ows:NoValues/>
+            <ows:DefaultValue>FALSE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="ManageStoredQueries">
+            <ows:NoValues/>
+            <ows:DefaultValue>FALSE</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="ImplementsAsyncProcessing">
+            <ows:NoValues/>
+            <ows:DefaultValue>TRUE</ows:DefaultValue>
+         </ows:Constraint>
+         <!-- ============================================================== -->
+         <ows:Constraint name="CountDefault">
+            <ows:NoValues/>
+            <ows:DefaultValue>10</ows:DefaultValue>
+         </ows:Constraint>
+         <ows:Constraint name="QueryExpression">
+            <ows:AllowedValues>
+               <ows:Value>wfs:Query</ows:Value>
+               <ows:Value>wfs:StoredQuery</ows:Value>
+            </ows:AllowedValues>
+         </ows:Constraint>
+      </ows:OperationsMetadata>
+      <FeatureTypeList>
+         <FeatureType>
+            <Name>cw:builtupa_1m</Name>
+            <Title>builtupa_1m</Title>
+            <DefaultCRS>urn:ogc:def:crs:EPSG::4269</DefaultCRS>
+            <OtherCRS>urn:ogc:def:crs:EPSG::42110</OtherCRS>
+            <!-- ... -->
+            <OtherCRS>urn:ogc:def:crs:EPSG::102002</OtherCRS>
+            <ows:WGS84BoundingBox>
+               <ows:LowerCorner>-179.1296 -53.1674</ows:LowerCorner>
+               <ows:UpperCorner>178.4432 70.9927</ows:UpperCorner>
+            </ows:WGS84BoundingBox>
+         </FeatureType>
+         <FeatureType>
+            <Name>cw:coastl_1m</Name>
+            <Title>coastl_1m</Title>
+            <DefaultCRS>urn:ogc:def:crs:EPSG::4326</DefaultCRS>
+            <OtherCRS>urn:ogc:def:crs:EPSG::42110</OtherCRS>
+            <!-- ... -->
+            <OtherCRS>urn:ogc:def:crs:EPSG::102002</OtherCRS>
+            <ows:WGS84BoundingBox>
+               <ows:LowerCorner>-179.999 -85.5827</ows:LowerCorner>
+               <ows:UpperCorner>179.9999 83.6274</ows:UpperCorner>
+            </ows:WGS84BoundingBox>
+         </FeatureType>
+         <FeatureType>
+            <Name>cw:depthl_1m</Name>
+            <Title>depthl_1m</Title>
+            <DefaultCRS>urn:ogc:def:crs:EPSG::4269</DefaultCRS>
+            <OtherCRS>urn:ogc:def:crs:EPSG::42110</OtherCRS>
+            <!-- ... -->
+            <OtherCRS>urn:ogc:def:crs:EPSG::102002</OtherCRS>
+            <ows:WGS84BoundingBox>
+               <ows:LowerCorner>-179.9999 -78.1118</ows:LowerCorner>
+               <ows:UpperCorner>179.9999 89.9186</ows:UpperCorner>
+            </ows:WGS84BoundingBox>
+         </FeatureType>
+         <FeatureType>
+            <Name>cw:polbndl_1m</Name>
+            <Title>polbndl_1m</Title>
+            <DefaultCRS>urn:ogc:def:crs:EPSG::4269</DefaultCRS>
+            <OtherCRS>urn:ogc:def:crs:EPSG::42110</OtherCRS>
+            <!-- ... -->
+            <OtherCRS>urn:ogc:def:crs:EPSG::102002</OtherCRS>
+            <ows:WGS84BoundingBox>
+               <ows:LowerCorner>-179.9999 -89.9999</ows:LowerCorner>
+               <ows:UpperCorner>179.9999 89.9979</ows:UpperCorner>
+            </ows:WGS84BoundingBox>
+         </FeatureType>
+         <FeatureType>
+            <Name>cw:soundings</Name>
+            <Title>soundings</Title>
+            <DefaultCRS>urn:ogc:def:crs:EPSG::4326</DefaultCRS>
+            <OtherCRS>urn:ogc:def:crs:EPSG::3857</OtherCRS>
+            <!-- ... -->
+            <OtherCRS>urn:ogc:def:crs:EPSG::102002</OtherCRS>
+            <ows:WGS84BoundingBox>
+               <ows:LowerCorner>-138.6394 69.9340</ows:LowerCorner>
+               <ows:UpperCorner>-138.6035 69.9549</ows:UpperCorner>
+            </ows:WGS84BoundingBox>
+         </FeatureType>
+      </FeatureTypeList>
+      <Filter_Capabilities xmlns="http://www.opengis.net/fes/2.0" ...>
+         <!-- ... -->
+      </Filter_Capabilities>
+   </WFS_Capabilities>
+----
+
+=== Implementation for Test Bed 12
+
+An implementation of the Asynchronous Processing class was deployed for test
+bed 12 at the following URL on Amazon's Cloud:
+
+----
+http://tb12.cubewerx.com/a007/cubeserv?datastore=USGS&
+   service=WFS&
+   request=GetCapabilities
+----
+
+The implementation was unremarkable.  As shown in the server's capabilities
+document, this deployment only implements the "mailto:" response handler.
+Technology integration experiments were sucessfully performed with the ESRI
+(DG002) and GMU (A109) thread clients.
+
+The following is an example of the notification message that the A007 server
+generates in response to an asynchronous GetFeature request:
+
+----
+The feature set download that you requested on 2016-10-27 at 08:09:51 EDT
+is now available at:
+
+http://tb12.cubewerx.com/a007/cubeserv/default/cachedDownloads/urn:cubewerx:wfs:4353a3f8-9c3e-11e6-a272-97ec260e3694:GetFeature:response
+
+It is approximately 8KB in size, and will be available for the
+next 72 hours (i.e., until 2016-10-30 at 08:09:51 EDT).
+----
