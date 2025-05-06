@@ -1,16 +1,19 @@
 # OGC Standards Tracker
 
-Please feel free to provide any change requests on existing Standards, documents in work, or new requirements for standardization here. Please first attempt to search for an item prior to submitting a duplicate of it. If an issue or request does not already exist, please file a request per the instructions below. Note: You will need to create your GitHub acccount prior to filing a request.
+Please feel free to provide any change requests on existing Standards, documents in work, or new requirements for standardization here. Please first attempt to search for an item before submitting a duplicate. If an issue or request does not already exist, please file a request per the instructions below. Note: You will need to create your GitHub account prior to filing a request.
 
 Below is some helpful information to get you started:
 
 *What is a Change Request?*
-If you believe you identified an inconsistancy, omission, typographic or grammatical error, or problem with a table or figure; AND you have a solution, then you have what it takes to submit a Change Request. That is, you are requesting that the publishing organization make a change to the standard.
+If you believe you identified an inconsistency, omission, typographic or grammatical error, or problem with a table or figure, AND you have a solution, then you have what it takes to submit a Change Request. That is, you are requesting that the publishing organization make a change to the standard.
 
 *What is a Requirement?*
-A requirement is a request for an organization to add or support something that they do not already cover or support. These might be in the form of a new feature or a new standard. It might need to spawn an New Work Item (ISO), or new Standards Working Group (OGC).
+A requirement is a request for an organization to add or support something that it does not already cover or support. This might be a new feature or a new standard. It might need to spawn a New Work Item (ISO) or new Standards Working Group (OGC).
 
 The below section is copied from the OGC Technical Committee Policies and Procedures [1]
+
+## How to Submit a Change Request
+The first step in submitting an OGC Change Request is to log into GitHub.  That may require you to create an account.  Once you are logged in, you can go to *Issues* and click on the green "New Issue" button in the upper right of the page.  From there, fill out as much information as you deem necessary for the Standards Working Group to understand the issue or problem and determine a way forward. The more information you submit, the easier it is to find a resolution.
 
 
 ## Change Request Proposals (CRP) to an OGC Standard
