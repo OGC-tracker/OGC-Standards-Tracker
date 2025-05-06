@@ -1,6 +1,14 @@
-# OGC-Standards-Tracker
+# OGC Standards Tracker
 
+Please feel free to provide any change requests on existing Standards, documents in work, or new requirements for standardization here. Please first attempt to search for an item prior to submitting a duplicate of it. If an issue or request does not already exist, please file a request per the instructions below. Note: You will need to create your GitHub acccount prior to filing a request.
 
+Below is some helpful information to get you started:
+
+*What is a Change Request?*
+If you believe you identified an inconsistancy, omission, typographic or grammatical error, or problem with a table or figure; AND you have a solution, then you have what it takes to submit a Change Request. That is, you are requesting that the publishing organization make a change to the standard.
+
+*What is a Requirement?*
+A requirement is a request for an organization to add or support something that they do not already cover or support. These might be in the form of a new feature or a new standard. It might need to spawn an New Work Item (ISO), or new Standards Working Group (OGC).
 
 The below section is copied from the OGC Technical Committee Policies and Procedures [1]
 
