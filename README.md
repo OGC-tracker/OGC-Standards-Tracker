@@ -10,11 +10,11 @@ If you believe you identified an inconsistency, omission, typographic or grammat
 *What is a Requirement?*
 A requirement is a request for an organization to add or support something that it does not already cover or support. This might be a new feature or a new standard. It might need to spawn a New Work Item (ISO) or new Standards Working Group (OGC).
 
-The below section is copied from the OGC Technical Committee Policies and Procedures [1]
-
 ## How to Submit a Change Request
 The first step in submitting an OGC Change Request is to log into GitHub.  That may require you to create an account.  Once you are logged in, you can go to *Issues* and click on the green "New Issue" button in the upper right of the page.  From there, fill out as much information as you deem necessary for the Standards Working Group to understand the issue or problem and determine a way forward. The more information you submit, the easier it is to find a resolution.
 
+
+The below section is copied from the OGC Technical Committee Policies and Procedures [1]
 
 ## Change Request Proposals (CRP) to an OGC Standard
 At any time, any OGC member or non-member can submit a CRP. A CRP allows for the formal documentation of a proposed change to an existing, adopted OGC Standard or Abstract Specification Topic. The change could be an identified error (see Corrigendum (errata) Changes to OGC Standards and Best and Community Practices), an inconsistency, a requested enhancement, or a major proposed enhancement.
