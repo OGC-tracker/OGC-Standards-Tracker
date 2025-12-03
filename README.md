@@ -1,6 +1,5 @@
 # OGC Standards Tracker
-
-Please feel free to provide any change requests on existing Standards, documents in work, or new requirements for standardization here. Please first attempt to search for an item before submitting a duplicate. If an issue or request does not already exist, please file a request per the instructions below. Note: You will need to create your GitHub account prior to filing a request.
+OGC welcomes corrections and suggestions for our standardization activities by anyone. Please feel free to provide any change requests on existing Standards, documents in work, or new requirements for standardization here. Please first attempt to search for an item before submitting a duplicate. If an issue or request does not already exist, please file a request per the instructions below. Note: You will need to create your GitHub account prior to filing a request.
 
 Below is some helpful information to get you started:
 
